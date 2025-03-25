@@ -17,21 +17,23 @@ read -N 999999 -t 0.001
 # Detect OS
 # $os_version variables aren't always in use, but are kept here for convenience
 if grep -qs "ubuntu" /etc/os-release; then
-	os="ubuntu"
-	os_version=$(grep 'VERSION_ID' /etc/os-release | cut -d '"' -f 2 | tr -d '.')
+    os="ubuntu"
+    os_version=$(grep 'VERSION_ID' /etc/os-release | cut -d '"' -f 2 | tr -d '.')
 elif [[ -e /etc/debian_version ]]; then
-	os="debian"
-	os_version=$(grep -oE '[0-9]+' /etc/debian_version | head -1)
+    os="debian"
+    os_version=$(grep -oE '[0-9]+' /etc/debian_version | head -1)
 elif [[ -e /etc/almalinux-release || -e /etc/rocky-release || -e /etc/centos-release ]]; then
-	os="centos"
-	os_version=$(grep -shoE '[0-9]+' /etc/almalinux-release /etc/rocky-release /etc/centos-release | head -1)
+    os="centos"
+    os_version=$(grep -shoE '[0-9]+' /etc/almalinux-release /etc/rocky-release /etc/centos-release | head -1)
 elif [[ -e /etc/fedora-release ]]; then
-	os="fedora"
-	os_version=$(grep -oE '[0-9]+' /etc/fedora-release | head -1)
+    os="fedora"
+    os_version=$(grep -oE '[0-9]+' /etc/fedora-release | head -1)
+elif grep -q "ID=arch" /etc/os-release || grep -q "Arch Linux" /etc/os-release || grep -q "ID_LIKE=.*arch" /etc/os-release; then
+    os="arch"
 else
-	echo "This installer seems to be running on an unsupported distribution.
-Supported distros are Ubuntu, Debian, AlmaLinux, Rocky Linux, CentOS and Fedora."
-	exit
+    echo "This installer seems to be running on an unsupported distribution.
+Supported distros are Ubuntu, Debian, AlmaLinux, Rocky Linux, CentOS, Fedora, EndeavourOS and Arch Linux."
+    exit
 fi
 
 if [[ "$os" == "ubuntu" && "$os_version" -lt 2204 ]]; then
@@ -296,6 +298,8 @@ if [[ ! -e /etc/wireguard/wg0.conf ]]; then
 				cron="cronie"
 			elif [[ "$os" == "debian" || "$os" == "ubuntu" ]]; then
 				cron="cron"
+			elif [[ "$os" == "arch" ]]; then
+				cron="cronie"
 			fi
 		fi
 	fi
@@ -333,6 +337,11 @@ if [[ ! -e /etc/wireguard/wg0.conf ]]; then
 			# Fedora
 			dnf install -y wireguard-tools qrencode $firewall
 			mkdir -p /etc/wireguard/
+		elif [[ "$os" == "arch" ]]; then
+			# Arch Linux
+			pacman -Syu --noconfirm
+			pacman -S --noconfirm wireguard-tools qrencode $firewall
+			mkdir -p /etc/wireguard/
 		fi
 	# Else, BoringTun needs to be used
 	else
@@ -354,6 +363,11 @@ if [[ ! -e /etc/wireguard/wg0.conf ]]; then
 		elif [[ "$os" == "fedora" ]]; then
 			# Fedora
 			dnf install -y wireguard-tools qrencode ca-certificates tar $cron $firewall
+			mkdir -p /etc/wireguard/
+		elif [[ "$os" == "arch" ]]; then
+			# Arch Linux
+			pacman -Syu --noconfirm
+			pacman -S --noconfirm wireguard-tools qrencode ca-certificates tar $cron $firewall
 			mkdir -p /etc/wireguard/
 		fi
 		# Grab the BoringTun binary using wget or curl and extract into the right place.
@@ -619,6 +633,10 @@ else
 						# Fedora
 						dnf remove -y wireguard-tools
 						rm -rf /etc/wireguard/
+					elif [[ "$os" == "arch" ]]; then
+						# Arch Linux
+						pacman -Rns --noconfirm wireguard-tools
+						rm -rf /etc/wireguard/
 					fi
 				else
 					{ crontab -l 2>/dev/null | grep -v '/usr/local/sbin/boringtun-upgrade' ; } | crontab -
@@ -637,6 +655,10 @@ else
 					elif [[ "$os" == "fedora" ]]; then
 						# Fedora
 						dnf remove -y wireguard-tools
+						rm -rf /etc/wireguard/
+					elif [[ "$os" == "arch" ]]; then
+						# Arch Linux
+						pacman -Rns --noconfirm wireguard-tools
 						rm -rf /etc/wireguard/
 					fi
 					rm -f /usr/local/sbin/boringtun /usr/local/sbin/boringtun-upgrade
